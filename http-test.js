@@ -30,6 +30,7 @@ const server = pqc.createServer({
   }
 }, c => {
   httpServer.emit('connection', c);
+  c.on('error', err => console.error(err));
 });
 
 // Prevent the server from keeping the process running.
@@ -52,6 +53,7 @@ server.listen(8124, () => {
         callback(null, conn);
       });
 
+      conn.on('error', err => console.error(err));
       // TODO: Errors
     }
   });

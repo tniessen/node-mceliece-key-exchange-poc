@@ -9,30 +9,28 @@ const { McEliece } = require('mceliece-nist');
 const { Duplex } = require('stream');
 const { createHash, createCipheriv, createDecipheriv, randomBytes } = require('crypto');
 
-// Used for public key identification and key derivation.
-const PROTO_HASH = 'sha256';
-const PROTO_HASH_SIZE = 32;
-// Used for symmetric encryption of the protected traffic.
-const PROTO_CIPHER = 'aes-256-ctr';
-const PROTO_KEY_SIZE = 32;
-const PROTO_IV_SIZE = 16;
-// Used for key exchange.
-const PROTO_KEM = 'mceliece6960119f';
+// Key exchange parameters.
+const kHashName   = 'sha256';
+const kCipherName = 'aes-256-ctr';
+const kKeySize    = 32;
+const kIvSize     = 16;
+const kKemName    = 'mceliece6960119f';
 
-const kem = new McEliece(PROTO_KEM);
+const kem = new McEliece(kKemName);
 
-const errorPrefix = Buffer.from('pqc#', 'ascii');
-const clientHelloPrefix = Buffer.from('pqc?', 'ascii');
-const serverHelloPrefix = Buffer.from('pqc!', 'ascii');
-const publicKeyRequestPrefix = Buffer.from('pqc+', 'ascii');
-const publicKeyReplyPrefix = Buffer.from('pqc=', 'ascii');
-const clientEncryptedKeyPrefix = Buffer.from('pqc*', 'ascii');
-const connectionReadyPrefix = Buffer.from('pqc$', 'ascii');
+// Message tags.
+const kTagClientHello      = 0x00;
+const kTagServerHello      = 0x01;
+const kTagPublicKeyRequest = 0x02;
+const kTagPublicKeyReply   = 0x03;
+const kTagEncryptedKey     = 0x04;
+const kTagTunnelReady      = 0x05;
+const kTagError            = 0xff;
 
-const kPending = Symbol('kPending');
-const kBuffer = Symbol('kBuffer');
-const kSecure = Symbol('kSecure');
 const kNextLayer = Symbol('kNextLayer');
+const kPending   = Symbol('kPending');
+const kBuffer    = Symbol('kBuffer');
+const kSecure    = Symbol('kSecure');
 
 function xor(a, b) {
   const result = Buffer.alloc(a.length);
@@ -42,11 +40,13 @@ function xor(a, b) {
 }
 
 function hash(bufs) {
-  const h = createHash(PROTO_HASH);
+  const h = createHash(kHashName);
   for (const buf of bufs)
     h.update(buf)
   return h.digest();
 }
+
+const computeKeyId = (key) => hash([key]);
 
 class PQCBase extends Duplex {
   constructor(nextLayer, options) {
@@ -56,16 +56,21 @@ class PQCBase extends Duplex {
     this[kBuffer] = Buffer.alloc(0);
 
     nextLayer.on('data', (chunk) => {
-      // TODO: Fix this, this should handle messages in a loop
       if (this[kBuffer]) {
         this[kBuffer] = Buffer.concat([this[kBuffer], chunk]);
-        if (this[kBuffer].length > 4) {
-          const payloadSize = this[kBuffer].readUInt32BE();
-          if (this[kBuffer].length >= 4 + payloadSize) {
-            const message = this[kBuffer].slice(4, 4 + payloadSize);
-            this[kBuffer] = this[kBuffer].slice(4 + payloadSize);
-            this.handleMessage(message);
-          }
+        while (this[kBuffer] && this[kBuffer].length >= 4) {
+          const tag = this[kBuffer][0];
+          const len = this[kBuffer][3] |
+                      (this[kBuffer][2] << 8) |
+                      (this[kBuffer][1] << 16) |
+                      this[kBuffer][3];
+
+          if (this[kBuffer].length < 4 + len)
+            break;
+
+          const message = this[kBuffer].slice(4);
+          this[kBuffer] = this[kBuffer].slice(4 + len);
+          this.handleMessage(tag, message);
         }
       } else {
         this.push(this[kSecure].recv.update(chunk));
@@ -73,10 +78,15 @@ class PQCBase extends Duplex {
     });
   }
 
-  writeMessage(msg) {
-    const buf = Buffer.alloc(4 + msg.length);
-    buf.writeUInt32BE(msg.length);
-    msg.copy(buf, 4);
+  writeMessage(tag, msg) {
+    let buf;
+    if (msg) {
+      buf = Buffer.alloc(4 + msg.length);
+      buf.writeUInt32BE((tag << 24) | msg.length);
+      msg.copy(buf, 4);
+    } else {
+      buf = Buffer.from([tag, 0, 0, 0]);
+    }
     this[kNextLayer].write(buf);
   }
 
@@ -96,8 +106,8 @@ class PQCBase extends Duplex {
     }
 
     this[kSecure] = {
-      recv: createDecipheriv(PROTO_CIPHER, keyIn, iv),
-      send: createCipheriv(PROTO_CIPHER, keyOut, iv)
+      recv: createDecipheriv(kCipherName, keyIn, iv),
+      send: createCipheriv(kCipherName, keyOut, iv)
     };
 
     this.push(this[kSecure].recv.update(this[kBuffer]));
@@ -156,20 +166,18 @@ class PQCClient extends PQCBase {
       sni = Buffer.from(this.sni, 'utf8');
     } else {
       this.debug(`initiating key exchange without SNI`);
-      sni = Buffer.alloc(0);
+      sni = undefined;
     }
 
-    const clientHello = Buffer.concat([clientHelloPrefix, sni]);
-    this.writeMessage(clientHello);
+    this.writeMessage(kTagClientHello, sni);
   }
 
-  handleServerHello(message) {
-    if (message.length !== 4 + PROTO_HASH_SIZE + PROTO_KEY_SIZE ||
-        !serverHelloPrefix.equals(message.slice(0, 4)))
+  handleServerHello(tag, message) {
+    if (tag !== kTagServerHello || message.length !== 2 * kKeySize)
       return this.emit('error', 'Invalid server hello');
 
-    this.publicKeyId = message.slice(4, 4 + PROTO_HASH_SIZE);
-    this.nonce = message.slice(4 + PROTO_HASH_SIZE);
+    this.publicKeyId = message.slice(0, kKeySize);
+    this.nonce = message.slice(kKeySize);
     this.debug(`got valid public key id and nonce`);
 
     // TODO: Pause processing of messages while waiting for async function
@@ -179,40 +187,41 @@ class PQCClient extends PQCBase {
       if (key === undefined) {
         this.debug(`unknown public key id`);
         this.handleMessage = this.handlePublicKeyReply;
-        this.writeMessage(publicKeyRequestPrefix);
+        this.writeMessage(kTagPublicKeyRequest);
       } else {
         this.actualKeyExchange(key);
       }
     });
   }
 
-  handlePublicKeyReply(message) {
-    if (message.length !== 4 + kem.publicKeySize) // TODO: Also check prefix
+  handlePublicKeyReply(tag, publicKey) {
+    if (tag !== kTagPublicKeyReply || publicKey.length !== kem.publicKeySize)
       return this.emit('error', 'Invalid public key reply');
 
-    const publicKey = message.slice(4);
-    if (!hash([publicKey]).equals(this.publicKeyId))
+    if (!computeKeyId(publicKey).equals(this.publicKeyId))
       return this.emit('error', 'Wrong public key');
 
     this.rememberPublicKey(this.publicKeyId, publicKey);
-    this.actualKeyExchange(message.slice(4));
+    this.actualKeyExchange(publicKey);
   }
 
   actualKeyExchange(publicKey) {
     const { key, encryptedKey } = kem.generateKey(publicKey);
-    const iv = randomBytes(PROTO_IV_SIZE);
+    const iv = randomBytes(kIvSize);
 
     this.key = key;
     this.iv = iv;
 
-    this.debug('sending k\' and iv');
+    this.debug('sending encrypted key and iv');
 
-    this.handleMessage = this.handleConnectionReady;
-    this.writeMessage(Buffer.concat([clientEncryptedKeyPrefix, encryptedKey, iv]));
+    this.handleMessage = this.handleTunnelReady;
+    this.writeMessage(kTagEncryptedKey, Buffer.concat([encryptedKey, iv]));
   }
 
-  handleConnectionReady() {
-    // TODO: Rewrite this function as a factory in order to pass key and IV as parameters?
+  handleTunnelReady(tag, message) {
+    if (tag !== kTagTunnelReady || message.length !== 0)
+      return this.emit('error', 'Invalid TunnelReady');
+
     this.setupEncryption(this.key, this.nonce, this.iv);
     delete this.key;
     delete this.nonce;
@@ -239,11 +248,11 @@ class PQCServer extends PQCBase {
     this.handleMessage = this.handleClientHello;
   }
 
-  handleClientHello(message) {
-    if (message.length < clientHelloPrefix.length || !clientHelloPrefix.equals(message.slice(0, clientHelloPrefix.length)))
-      return this.emit('error', new Error(`Invalid client hello`));
+  handleClientHello(tag, message) {
+    if (tag !== kTagClientHello)
+      return this.emit('error', new Error(`Invalid ClientHello`));
 
-    this.sni = message.slice(clientHelloPrefix.length).toString('utf8');
+    this.sni = message.toString('utf8');
 
     if (this.sni.length !== 0) {
       this.debug(`client initiated key exchange with SNI ${this.sni}`);
@@ -254,59 +263,56 @@ class PQCServer extends PQCBase {
     this.getPublicKeyId(this.sni, (err, id) => {
       if (err) {
         this.debug(`no public key`);
-        this.writeMessage(Buffer.concat([errorPrefix, err]));
+        this.writeMessage(kTagError, err);
       } else {
         this.debug(`using public key id ${id.toString('hex').substr(0, 16)}`);
-        this.nonce = randomBytes(PROTO_KEY_SIZE);
+        this.nonce = randomBytes(kKeySize);
         this.debug(`generated nonce`);
-        this.writeMessage(Buffer.concat([serverHelloPrefix, id, this.nonce]));
+        this.writeMessage(kTagServerHello, Buffer.concat([id, this.nonce]));
         this.handleMessage = this.handlePublicKeyRequest;
       }
     });
   }
 
-  handlePublicKeyRequest(message) {
-    if (message.length >= clientEncryptedKeyPrefix.length &&
-        clientEncryptedKeyPrefix.equals(message.slice(0, 4))) {
-      this.debug(`client skipped public key request`);
-      return handleClientEncryptedKey(message);
+  handlePublicKeyRequest(tag, message) {
+    if (tag === kTagEncryptedKey) {
+      this.debug(`client skipped PublicKeyRequest`);
+      return this.handleEncryptedKey(tag, message);
     }
 
-    if (!message.equals(publicKeyRequestPrefix))
-      return this.emit('error', new Error('Invalid public key request'));
+    if (tag !== kTagPublicKeyRequest || message.length !== 0)
+      return this.emit('error', new Error('Invalid PublicKeyRequest'));
 
     this.debug(`client requested public key`);
 
     this.getPublicKey(this.sni, (err, key) => {
       if (err) {
         this.debug(`failed to retrieve public key`);
-        this.writeMessage(Buffer.concat([errorPrefix, err]));
+        this.writeMessage(kTagError, err);
       } else {
         this.debug(`transmitting public key (${key.length} bytes)`);
-        this.writeMessage(Buffer.concat([publicKeyReplyPrefix, key]));
-        this.handleMessage = this.handleClientEncryptedKey;
+        this.writeMessage(kTagPublicKeyReply, key);
+        this.handleMessage = this.handleEncryptedKey;
       }
     });
   }
 
-  handleClientEncryptedKey(message) {
-    if (message.length !== 4 + kem.encryptedKeySize + PROTO_IV_SIZE)
-      return this.emit('error', new Error('Invalid client encrypted key'));
+  handleEncryptedKey(tag, message) {
+    if (tag !== kTagEncryptedKey || message.length !== kem.encryptedKeySize + kIvSize)
+      return this.emit('error', new Error('Invalid EncryptedKey'));
 
     this.getPrivateKey(this.sni, (err, key) => {
       // TODO: Handle error
 
-      const decryptedKey = kem.decryptKey(key, message.slice(4, 4 + kem.encryptedKeySize));
+      const encryptedKey = message.slice(0, kem.encryptedKeySize);
+      const decryptedKey = kem.decryptKey(key, encryptedKey);
+      const iv = message.slice(kem.encryptedKeySize);
       this.debug('recovered k\' from encrypted message');
 
-      this.writeMessage(connectionReadyPrefix);
-      this.setupEncryption(decryptedKey,
-                           this.nonce,
-                           message.slice(4 + kem.encryptedKeySize));
+      this.writeMessage(kTagTunnelReady);
+      this.setupEncryption(decryptedKey, this.nonce, iv);
     });
   }
 }
-
-const computeKeyId = (key) => hash([key]);
 
 module.exports = { PQCClient, PQCServer, computeKeyId, kem };

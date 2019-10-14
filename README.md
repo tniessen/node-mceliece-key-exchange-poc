@@ -24,35 +24,95 @@ The protocol does not negotiate these parameters.
 
 # Message format
 
-Each message has the format
+Each message has the following format:
 
 ```
-| 0..31 | 32..63 | 63..32+8*len |
----------------------------------
-| len   | tag    | data         |
----------------------------------
+| Byte offset | 0   | 1 .. 3 | 4 .. 3+len |
+-------------------------------------------
+| Field       | tag | len    | data       |
+-------------------------------------------
+```
+
+The multibyte `len` field uses big-endian encoding.
+
+## 0x00: ClientHello
+
+```
+| Byte offset | 0    | 1 .. 3 | 4 .. 3+len |
+--------------------------------------------
+| Field       | 0x00 | len    | sni        |
+--------------------------------------------
+```
+
+The `sni` field is optional. If it is set, it contains the hostname that the
+client wants to connect to.
+
+## 0x01: ServerHello
+
+```
+| Byte offset | 0    | 1 .. 3 | 4 .. 3+s/8 | 4+s/8 .. 3+s/4 |
+-------------------------------------------------------------
+| Field       | 0x01 | s / 4  | key_id     | nonce          |
+-------------------------------------------------------------
+```
+
+## 0x02: PublicKeyRequest
+
+```
+| Byte offset | 0    | 1 .. 3 |
+-------------------------------
+| Field       | 0x02 | 0      |
+-------------------------------
+```
+
+## 0x03: PublicKeyReply
+
+```
+| Byte offset | 0    | 1 .. 3 | 4 .. 3+len |
+--------------------------------------------
+| Field       | 0x03 | len    | public_key |
+--------------------------------------------
+```
+
+## 0x04: EncryptedKey
+
+
+```
+| Byte offset | 0    | 1 .. 3 | 4 .. 3+s/8    | 4+s/8 .. 3+len |
+----------------------------------------------------------------
+| Field       | 0x04 | len    | encrypted_key | iv             |
+----------------------------------------------------------------
+```
+
+## 0x05: TunnelReady
+
+```
+| Byte offset | 0    | 1 .. 3 |
+-------------------------------
+| Field       | 0x05 | 0      |
+-------------------------------
 ```
 
 # Steps
 
- 1. The client begins the key exchange by sending a `kClientHello` message. This
+ 1. The client begins the key exchange by sending a `ClientHello` message. This
     message has an optional `sni` field. It allows to pass a hostname to the
     server.
  2. The server selects a CM public key `T` and a `s`-bit nonce `N` for the
-    connection. It sends a `kServerHello` message and sets the `key_id` field to
+    connection. It sends a `ServerHello` message and sets the `key_id` field to
     `H(T)` and `nonce` to `N`.
  3. If the client has a local copy of `T` identified by `H(T)`, proceed at step 6.
- 4. The client sends a `kPublicKeyRequest` message.
- 5. The server sends a `kPublicKeyResponse` message and sets the `public_key`
+ 4. The client sends a `PublicKeyRequest` message.
+ 5. The server sends a `PublicKeyResponse` message and sets the `public_key`
     field to `T`.
  6. The client selects a random initialization vector `v` of length `b`, and
     performs the CM key encapsulation operation using the public key `T` in order
     to obtain a random key `K` of length `s` and the ciphertext `C`.
- 7. The client sends a `kEncryptedKey` message and sets the `iv` field to `v` and
+ 7. The client sends a `EncryptedKey` message and sets the `iv` field to `v` and
     `encrypted_key` to `C`.
  8. The server performs the CM key decapsulation operation using the public key
     `T` and the ciphertext `C` to obtain `K`.
- 9. The server sends a `kTunnelReady` message.
+ 9. The server sends a `TunnelReady` message.
 10. Both parties compute `K' = K ⊕ N`.
 11. Both parties compute `K_1 = H(00000000 || K')` and
     `K_2 = H(11111111 || K')`.
