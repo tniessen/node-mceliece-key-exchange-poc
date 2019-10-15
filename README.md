@@ -52,75 +52,34 @@ The protocol does not negotiate these parameters.
 
 # Message format
 
-Each message has the following format:
+The message format is intentionally kept very simple. Each message begins with a
+single byte that indicates the type of the message, followed by three bytes
+that encode the length of the rest of the message as a big-endian 24-bit
+integer. This header is only four bytes long, but limits the total size of all
+contained fields to 16 megabytes.
 
 ```
-| Byte offset | 0   | 1 .. 3 | 4 .. 3+len |
--------------------------------------------
-| Field       | tag | len    | data       |
--------------------------------------------
+--------------------------------------------------------
+| Byte offset | 0   | 1 .. 3 | 4        ..       3+len |
+--------------------------------------------------------
+| Field       | tag | length | field 1 | field 2 | ... |
+--------------------------------------------------------
 ```
 
-The single-byte `tag` value determines the type of the message.
-The multibyte `len` field uses big-endian encoding.
+Message types and their fields:
 
-## 0x00: ClientHello
-
-```
-| Byte offset | 0    | 1 .. 3 | 4 .. 3+len |
---------------------------------------------
-| Field       | 0x00 | len    | sni        |
---------------------------------------------
-```
-
-The `sni` field is optional. If it is set, it contains the hostname that the
-client wants to connect to.
-
-## 0x01: ServerHello
-
-```
-| Byte offset | 0    | 1 .. 3 | 4 .. 3+s/8 | 4+s/8 .. 3+s/4 |
--------------------------------------------------------------
-| Field       | 0x01 | s / 4  | key_id     | nonce          |
--------------------------------------------------------------
-```
-
-## 0x02: PublicKeyRequest
-
-```
-| Byte offset | 0    | 1 .. 3 |
--------------------------------
-| Field       | 0x02 | 0      |
--------------------------------
-```
-
-## 0x03: PublicKeyReply
-
-```
-| Byte offset | 0    | 1 .. 3 | 4 .. 3+len |
---------------------------------------------
-| Field       | 0x03 | len    | public_key |
---------------------------------------------
-```
-
-## 0x04: EncryptedKey
-
-
-```
-| Byte offset | 0    | 1 .. 3 | 4 .. 3+s/8    | 4+s/8 .. 3+len |
-----------------------------------------------------------------
-| Field       | 0x04 | len    | encrypted_key | iv             |
-----------------------------------------------------------------
-```
-
-## 0x05: TunnelReady
-
-```
-| Byte offset | 0    | 1 .. 3 |
--------------------------------
-| Field       | 0x05 | 0      |
--------------------------------
-```
+- **ClientHello**
+  - `sni`: hostname that the client is trying to connect to (optional)
+- **ServerHello**
+  - `key_id`: uniquely identifies the server's public key
+  - `nonce`: selected randomly by the server
+- **PublicKeyRequest**
+- **PublicKeyReply**
+  - `public_key`: the server's public key
+- **EncryptedKey**
+  - `encrypted_key`: ciphertext produced by CM key encapsulation
+  - `iv`: randomly chosen initialization vector
+- **TunnelReady**
 
 # Security considerations
 
