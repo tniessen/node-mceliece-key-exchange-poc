@@ -116,7 +116,7 @@ The client can choose the initialization vector `v` freely, leaving no way for
 the server to influence its choice. If the client chooses `v` at random, the
 chance of choosing a previously used initialization vector is small, in fact,
 the probability of coincidentally reusing an initialization vector reaches
-1% after not less than 2.6e18 key exchanges (see
+1% after not less than 2.6 * 10<sup>18</sup> key exchanges (see
 [Birthday attack](https://en.wikipedia.org/wiki/Birthday_attack#Mathematics)).
 This does not prevent clients from intentionally reusing initialization vectors,
 but as we will see in the following, this does not present a problem.
