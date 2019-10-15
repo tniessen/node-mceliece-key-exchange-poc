@@ -22,6 +22,34 @@ such as TCP or TLS. It is not suited for connectionless communication.
 
 The protocol does not negotiate these parameters.
 
+# Steps
+
+ 1. The client begins the key exchange by sending a `ClientHello` message. This
+    message has an optional `sni` field. It allows to pass a hostname to the
+    server.
+ 2. The server selects a CM public key `T` and a `s`-bit nonce `N` for the
+    connection. It sends a `ServerHello` message and sets the `key_id` field to
+    `H(T)` and `nonce` to `N`.
+ 3. If the client has a local copy of `T` identified by `H(T)`, proceed at step 6.
+ 4. The client sends a `PublicKeyRequest` message.
+ 5. The server sends a `PublicKeyResponse` message and sets the `public_key`
+    field to `T`.
+ 6. The client selects a random initialization vector `v` of length `b`, and
+    performs the CM key encapsulation operation using the public key `T` in order
+    to obtain a random key `K` of length `s` and the ciphertext `C`.
+ 7. The client sends a `EncryptedKey` message and sets the `iv` field to `v` and
+    `encrypted_key` to `C`.
+ 8. The server performs the CM key decapsulation operation using the public key
+    `T` and the ciphertext `C` to obtain `K`.
+ 9. The server sends a `TunnelReady` message.
+10. Both parties compute `K' = K ⊕ N`.
+11. Both parties compute `K_1 = H(00000000 || K')` and
+    `K_2 = H(11111111 || K')`.
+12. Both parties set up the tunnel by encrypting the remainder of the connection
+    with the symmetric cipher `E` using the initialization vector `v` and the
+    key `K_1` for data from the server to the client, and `K_2` for data from
+    client to the server.
+
 # Message format
 
 Each message has the following format:
@@ -33,6 +61,7 @@ Each message has the following format:
 -------------------------------------------
 ```
 
+The single-byte `tag` value determines the type of the message.
 The multibyte `len` field uses big-endian encoding.
 
 ## 0x00: ClientHello
@@ -93,35 +122,18 @@ client wants to connect to.
 -------------------------------
 ```
 
-# Steps
+# Security considerations
 
- 1. The client begins the key exchange by sending a `ClientHello` message. This
-    message has an optional `sni` field. It allows to pass a hostname to the
-    server.
- 2. The server selects a CM public key `T` and a `s`-bit nonce `N` for the
-    connection. It sends a `ServerHello` message and sets the `key_id` field to
-    `H(T)` and `nonce` to `N`.
- 3. If the client has a local copy of `T` identified by `H(T)`, proceed at step 6.
- 4. The client sends a `PublicKeyRequest` message.
- 5. The server sends a `PublicKeyResponse` message and sets the `public_key`
-    field to `T`.
- 6. The client selects a random initialization vector `v` of length `b`, and
-    performs the CM key encapsulation operation using the public key `T` in order
-    to obtain a random key `K` of length `s` and the ciphertext `C`.
- 7. The client sends a `EncryptedKey` message and sets the `iv` field to `v` and
-    `encrypted_key` to `C`.
- 8. The server performs the CM key decapsulation operation using the public key
-    `T` and the ciphertext `C` to obtain `K`.
- 9. The server sends a `TunnelReady` message.
-10. Both parties compute `K' = K ⊕ N`.
-11. Both parties compute `K_1 = H(00000000 || K')` and
-    `K_2 = H(11111111 || K')`.
-12. Both parties set up the tunnel by encrypting the remainder of the connection
-    with the symmetric cipher `E` using the initialization vector `v` and the
-    key `K_1` for data from the server to the client, and `K_2` for data from
-    client to the server.
+## Man-in-the-middle attacks
 
-# Prevention of key and IV reuse
+Since this protocol does not perform any kind of authentication, it does not
+protect against man-in-the-middle attacks. An attacker who can intercept the
+communication between client and server can use their own public key instead of
+the server's public key, and then perform the key exchange both between client
+and attacker and attacker and server. This would allow the attacker to observe
+and manipulate all transmitted data.
+
+## Prevention of key and IV reuse
 
 A critical aspect when using AES in Counter mode is to prevent the reuse of
 pairs of keys and initialization vectors. The protocol achieves this in the
