@@ -95,7 +95,7 @@ and manipulate all transmitted data.
 ## Maximum transmission size
 
 This protocol does not support renegotiations of the used keys or initialization
-vector. For AES in Conter mode, this restriction means that the initialization
+vector. For AES in Counter mode, this restriction means that the initialization
 vector will be reused after a fixed number of blocks have been transmitted.
 Reusing the initialization vector with the same key could negatively affect the
 security of the transferred data, it is therefore important to restrict the size
@@ -103,8 +103,8 @@ of the transmission such that this does not happen.
 
 With the chosen parameters, the initialization vector will be reused after
 exactly `2^b` blocks, each having a size of `b` bits. The maximum transmission
-size is therefore `b * 2^b`, which equals 5.07e30 gigabytes. Note that this
-restriction applies to each transmission direction independently.
+size is therefore `b * 2^b` bits, which equals 5.07 * 10<sup>30</sup> gigabytes.
+Note that this restriction applies to each transmission direction independently.
 
 ## Prevention of key and IV reuse
 
