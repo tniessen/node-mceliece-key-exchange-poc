@@ -106,11 +106,11 @@ exactly `2^b` blocks, each having a size of `b` bits. The maximum transmission
 size is therefore `b * 2^b` bits, which equals 5.07 * 10<sup>30</sup> gigabytes.
 Note that this restriction applies to each transmission direction independently.
 
-## Prevention of key and IV reuse
+## Prevention of (intentional) key and IV reuse
 
-A critical aspect when using AES in Counter mode is to prevent the reuse of
-pairs of keys and initialization vectors. The protocol achieves this in the
-following ways:
+Apart from restricting the transmission size to avoid accidental reuse of
+pairs of keys and initialization vectors, the protocol also ensures that neither
+the client nor the server can intentionally cause such pairs to be reused.
 
 The client can choose the initialization vector `v` freely, leaving no way for
 the server to influence its choice. If the client chooses `v` at random, the
