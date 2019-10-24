@@ -62,8 +62,7 @@ class PQCBase extends Duplex {
           const tag = this[kBuffer][0];
           const len = this[kBuffer][3] |
                       (this[kBuffer][2] << 8) |
-                      (this[kBuffer][1] << 16) |
-                      this[kBuffer][3];
+                      (this[kBuffer][1] << 16);
 
           if (this[kBuffer].length < 4 + len)
             break;
