@@ -172,16 +172,22 @@ class PQCClient extends PQCBase {
   }
 
   handleServerHello(tag, message) {
-    if (tag !== kTagServerHello || message.length !== 2 * kKeySize)
+    if (tag !== kTagServerHello || message.length < 2 * kKeySize)
       return this.emit('error', 'Invalid server hello');
 
     this.publicKeyId = message.slice(0, kKeySize);
-    this.nonce = message.slice(kKeySize);
+    this.nonce = message.slice(kKeySize, 2 * kKeySize);
     this.debug(`got valid public key id and nonce`);
 
+    const keySignature = message.slice(2 * kKeySize);
+
     // TODO: Pause processing of messages while waiting for async function
-    this.getPublicKey(this.publicKeyId, (err, key) => {
-      // TODO: Handle error
+    this.getPublicKey(this.publicKeyId, keySignature, (err, key) => {
+      if (err) {
+        this.debug(`error: ${err}`);
+        this.writeMessage(kTagError, err); // TODO: Convert err to something that can be transmitted, also elsewhere.
+        return;
+      }
 
       if (key === undefined) {
         this.debug(`unknown public key id`);
@@ -259,7 +265,7 @@ class PQCServer extends PQCBase {
       this.debug(`client initiated key exchange without SNI`);
     }
 
-    this.getPublicKeyId(this.sni, (err, id) => {
+    this.getPublicKeyId(this.sni, (err, id, keySignature) => {
       if (err) {
         this.debug(`no public key`);
         this.writeMessage(kTagError, err);
@@ -267,7 +273,10 @@ class PQCServer extends PQCBase {
         this.debug(`using public key id ${id.toString('hex').substr(0, 16)}`);
         this.nonce = randomBytes(kKeySize);
         this.debug(`generated nonce`);
-        this.writeMessage(kTagServerHello, Buffer.concat([id, this.nonce]));
+        const fields = [id, this.nonce];
+        if (keySignature !== undefined)
+          fields.push(keySignature);
+        this.writeMessage(kTagServerHello, Buffer.concat(fields));
         this.handleMessage = this.handlePublicKeyRequest;
       }
     });

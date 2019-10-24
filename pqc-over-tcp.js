@@ -27,7 +27,8 @@ function connect(options, connectListener) {
     tcpClientDebug('connected');
 
     pqc.beginKeyExchange();
-    pqc.once('encrypted', connectListener);
+    if (connectListener)
+      pqc.once('encrypted', connectListener);
   });
 
   client.on('close', () => tcpClientDebug('disconnected'));

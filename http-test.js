@@ -43,7 +43,7 @@ server.listen(8124, () => {
       const conn = pqc.connect({
         hostname: options.hostname,
         port: options.port,
-        getPublicKey(id, callback) {
+        getPublicKey(id, signature, callback) {
           callback(null);
         },
         rememberPublicKey(id, key) {

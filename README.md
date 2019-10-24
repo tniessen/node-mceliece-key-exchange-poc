@@ -29,7 +29,8 @@ The protocol does not negotiate these parameters.
     server.
  2. The server selects a CM public key `T` and a `s`-bit nonce `N` for the
     connection. It sends a `ServerHello` message and sets the `key_id` field to
-    `H(T)` and `nonce` to `N`.
+    `H(T)` and `nonce` to `N`. The server can also set the `key_signature` field
+    to allow the client to authenticate the server using external measures.
  3. If the client has a local copy of `T` identified by `H(T)`, proceed at step 6.
  4. The client sends a `PublicKeyRequest` message.
  5. The server sends a `PublicKeyResponse` message and sets the `public_key`
@@ -73,6 +74,7 @@ Message types and their fields:
 - **ServerHello**
   - `key_id`: uniquely identifies the server's public key
   - `nonce`: selected randomly by the server
+  - `key_signature`: externally produced and verified signature (optional)
 - **PublicKeyRequest**
 - **PublicKeyReply**
   - `public_key`: the server's public key
