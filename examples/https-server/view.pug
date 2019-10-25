@@ -1,0 +1,39 @@
+doctype html
+html
+  head
+    meta(chatset='utf8')
+    title Secure connection
+    style.
+      .container {
+        max-width: 800px;
+        margin: auto;
+        font-family: sans-serif;
+      }
+      .lead {
+        font-weight: normal;
+      }
+      .hexval {
+        word-wrap: break-word;
+        font-family: monospace;
+        background-color: #eaeaea;
+        padding: 5px;
+      }
+  body
+    .container
+      h2 HTTP layer
+      p.lead Host:
+      p.hexval= http.host
+      hr
+      h2 TLS layer
+      p.lead Serial number:
+      p.hexval= tls.cert.serialNumber
+      p.lead Fingerprint (SHA-1):
+      p.hexval= tls.cert.fingerprint
+      p.lead Fingerprint (SHA-256):
+      p.hexval= tls.cert.fingerprint256
+      hr
+      h2 PQC layer
+      p.lead Public key id:
+      p.hexval= pqc.publicKeyId
+      p.lead Public key signature:
+      p.hexval= pqc.publicKeySignature
