@@ -94,6 +94,16 @@ the server's public key, and then perform the key exchange both between client
 and attacker and attacker and server. This would allow the attacker to observe
 and manipulate all transmitted data.
 
+However, the server can use the `key_signature` field of the `ServerHello`
+message to provide an externally generated signature of its CM public key. For
+example, when using TLS on top of this protocol, the server can determine the
+TLS certificate that it will use for the TLS handshake upon receiving the
+`ClientHello` message, and can use its TLS private key to sign the CM public
+key. This signature is then transmitted as part of the `ServerHello` message.
+After the key exchange is completed, the TLS handshake takes over. Once the
+client receives the TLS certificate, it can verify the signature and thus the
+authenticity of the CM public key.
+
 ## Maximum transmission size
 
 This protocol does not support renegotiations of the used keys or initialization
