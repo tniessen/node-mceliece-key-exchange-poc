@@ -21,8 +21,11 @@ html
   body
     .container
       h2 HTTP layer
-      p.lead Host:
-      p.hexval= http.host
+      p.lead Request:
+      p.hexval
+        each line in http.reqLines
+          = line
+          br
       hr
       h2 TLS layer
       p.lead Serial number:

@@ -31,10 +31,15 @@ const httpsServer = https.createServer(httpsOptions, (req, res) => {
 
   const cert = req.socket.getCertificate();
 
+  const reqLines = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
+  for (let i = 0; i < req.rawHeaders.length; i += 2) {
+    reqLines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`);
+  }
+
   res.setHeader('Content-Type', 'text/html');
   res.end(render({
     http: {
-      host: req.headers['host']
+      reqLines
     },
     tls: {
       cert
