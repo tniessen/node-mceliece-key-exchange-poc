@@ -2,8 +2,8 @@
 
 const http = require('http');
 
-const pqc = require('./pqc-over-tcp');
-const { kem, computeKeyId } = require('./protocol');
+const pqc = require('../pqc-over-tcp');
+const { kem, computeKeyId } = require('../protocol');
 
 const httpServerDebug = require('debug')('http:server');
 const httpClientDebug = require('debug')('http:client');

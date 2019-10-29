@@ -4,8 +4,8 @@ const { createPublicKey, sign, verify } = require('crypto');
 const fs = require('fs');
 const https = require('https');
 
-const pqc = require('./pqc-over-tcp');
-const { kem, computeKeyId } = require('./protocol');
+const pqc = require('../pqc-over-tcp');
+const { kem, computeKeyId } = require('../protocol');
 
 const httpsServerDebug = require('debug')('https:server');
 const httpsClientDebug = require('debug')('https:client');
