@@ -313,12 +313,13 @@ class PQCServer extends PQCBase {
       // TODO: Handle error
 
       const encryptedKey = message.slice(0, kem.encryptedKeySize);
-      const decryptedKey = kem.decryptKey(key, encryptedKey);
-      const iv = message.slice(kem.encryptedKeySize);
-      this.debug('recovered k\' from encrypted message');
+      kem.decryptKey(key, encryptedKey, (err, decryptedKey) => {
+        const iv = message.slice(kem.encryptedKeySize);
+        this.debug('recovered k\' from encrypted message');
 
-      this.writeMessage(kTagTunnelReady);
-      this.setupEncryption(decryptedKey, this.nonce, iv);
+        this.writeMessage(kTagTunnelReady);
+        this.setupEncryption(decryptedKey, this.nonce, iv);
+      });
     });
   }
 }
