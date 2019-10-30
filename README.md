@@ -24,10 +24,9 @@ The following parameters are specified by Berstein et al. in section 2.1:
 
 The following parameters are specific to this protocol:
 
-- `E` is the symmetric cipher. We suggest using AES in Counter mode.
-- `s` is the size of the symmetric key. We suggest using 256 bits.
-- `b` is the size of the initialization vector. In the case of AES in Counter
-  mode, this must be 128 bits.
+- `E` is the symmetric cipher.
+- `s` is the size of the symmetric key used by `E`.
+- `b` is the size of the initialization vector used by `E`.
 - `H'` is a hash function with output size greater than or equal to `s`.
 
 The protocol does not negotiate these parameters. For this implementation, we
