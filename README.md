@@ -105,7 +105,14 @@ Message types and their fields:
 
 # Security considerations
 
-## Man-in-the-middle attacks
+## Replay attacks
+
+Replay attacks from either side are easily prevented since both the client
+and the server randomly affect the generated keys. A more detailed analysis
+can be found below in the section "Prevention of (intentional) key and IV
+reuse".
+
+## Authentication and Man-in-the-middle attacks
 
 Since this protocol does not perform any kind of authentication, it does not
 protect against man-in-the-middle attacks. An attacker who can intercept the
