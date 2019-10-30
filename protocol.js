@@ -10,11 +10,11 @@ const { Duplex } = require('stream');
 const { createHash, createCipheriv, createDecipheriv, randomBytes } = require('crypto');
 
 // Key exchange parameters.
-const kHashName   = 'sha256';
+const kHashName   = 'shake256';
 const kCipherName = 'aes-256-ctr';
 const kKeySize    = 32;
 const kIvSize     = 16;
-const kKemName    = 'mceliece6960119f';
+const kKemName    = 'mceliece6960119';
 
 const kem = new McEliece(kKemName);
 

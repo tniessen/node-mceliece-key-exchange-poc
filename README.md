@@ -37,11 +37,10 @@ proposed by Bernstein et al.:
 - t = 119
 - m = 13
 - f(z) = z<sup>13</sup> + z<sup>4</sup> + z<sup>3</sup> + z + 1
-- H = SHAKE256
+- H = H' = SHAKE256
 - E = AES-CTR
 - s = 256
 - b = 128
-- H' = SHA-256
 
 # Steps
 
