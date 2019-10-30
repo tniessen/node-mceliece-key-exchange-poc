@@ -13,14 +13,36 @@ such as TCP or TLS. It is not suited for connectionless communication.
 
 # Parameters
 
+The following parameters are specified by Berstein et al. in section 2.1:
+
+- `n` is the code length.
+- `t` is the error-correction capability of the linear code.
+- `m` is the logarithm to base 2 of the size of the used field.
+- `f` is a monic irreducible polynomial of degree `m` that defines a
+  representation of the finite field 𝔽<sub>2<sup>m</sup></sub>.
+- `H` is a cryptographic hash function.
+
+The following parameters are specific to this protocol:
+
 - `E` is the symmetric cipher. We suggest using AES in Counter mode.
 - `s` is the size of the symmetric key. We suggest using 256 bits.
 - `b` is the size of the initialization vector. In the case of AES in Counter
   mode, this must be 128 bits.
-- `H` is a hash function. The output size of `H` must be equal to `s`. We
-  suggest using SHA-256.
+- `H'` is a hash function with output size greater than or equal to `s`.
 
-The protocol does not negotiate these parameters.
+The protocol does not negotiate these parameters. For this implementation, we
+chose the following parameters based on the parameter set `kem/mceliece6960119`
+proposed by Bernstein et al.:
+
+- n = 6960
+- t = 119
+- m = 13
+- f(z) = z<sup>13</sup> + z<sup>4</sup> + z<sup>3</sup> + z + 1
+- H = SHAKE256
+- E = AES-CTR
+- s = 256
+- b = 128
+- H' = SHA-256
 
 # Steps
 
@@ -29,9 +51,9 @@ The protocol does not negotiate these parameters.
     server.
  2. The server selects a CM public key `T` and a `s`-bit nonce `N` for the
     connection. It sends a `ServerHello` message and sets the `key_id` field to
-    `H(T)` and `nonce` to `N`. The server can also set the `key_signature` field
+    `H'(T)` and `nonce` to `N`. The server can also set the `key_signature` field
     to allow the client to authenticate the server using external measures.
- 3. If the client has a local copy of `T` identified by `H(T)`, proceed at step 6.
+ 3. If the client has a local copy of `T` identified by `H'(T)`, proceed at step 6.
  4. The client sends a `PublicKeyRequest` message.
  5. The server sends a `PublicKeyResponse` message and sets the `public_key`
     field to `T`.
@@ -44,8 +66,8 @@ The protocol does not negotiate these parameters.
     `T` and the ciphertext `C` to obtain `K`.
  9. The server sends a `TunnelReady` message.
 10. Both parties compute `K' = K ⊕ N`.
-11. Both parties compute `K_1 = H(00000000 || K')` and
-    `K_2 = H(11111111 || K')`.
+11. Both parties compute `K_1 = H'(00000000 || K')` and
+    `K_2 = H'(11111111 || K')`.
 12. Both parties set up the tunnel by encrypting the remainder of the connection
     with the symmetric cipher `E` using the initialization vector `v` and the
     key `K_1` for data from the server to the client, and `K_2` for data from
@@ -142,7 +164,7 @@ there are two possible strategies for causing `K_1` or `K_2` to be reused:
 
 1. Given `K_1` and `K_2`, find a valid `K'` such that `00000000 || K'` (or
    `11111111 || K'`, respectively) is a preimage of `K_1` (or `K_2`,
-   respectivly) under `H`. This is infeasible due to `H` having the property
+   respectivly) under `H'`. This is infeasible due to `H'` having the property
    of (weak) collision resistance.
 2. Given `K'`, find a valid ciphertext `C` that, when decrypted, produces a `K`
    with `K' = K ⊕ N`, thus resulting in the same keys `K_1` and `K_2`.
