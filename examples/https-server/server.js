@@ -11,19 +11,19 @@ const { kem, computeKeyId } = require('../../protocol');
 const httpsServerDebug = require('debug')('https:server');
 
 const httpsOptions = {
-  key: fs.readFileSync('../key.pem', 'ascii'),
-  cert: fs.readFileSync('../cert.pem', 'ascii')
+  key: fs.readFileSync(`${__dirname}/../key.pem`, 'ascii'),
+  cert: fs.readFileSync(`${__dirname}/../cert.pem`, 'ascii')
 };
 
 // Generate the server key pair.
+httpsServerDebug('generating keypair');
 const { publicKey, privateKey } = kem.keypair();
 const publicKeyId = computeKeyId(publicKey);
-httpsServerDebug('generated public key');
 
 // Sign the public key id.
 const publicKeySignature = sign('sha256', publicKeyId, httpsOptions.key);
 
-const render = pug.compileFile('view.pug');
+const render = pug.compileFile(`${__dirname}/view.pug`);
 
 // Create the HTTPS server.
 const httpsServer = https.createServer(httpsOptions, (req, res) => {

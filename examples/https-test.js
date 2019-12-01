@@ -11,11 +11,12 @@ const httpsServerDebug = require('debug')('https:server');
 const httpsClientDebug = require('debug')('https:client');
 
 const httpsOptions = {
-  key: fs.readFileSync('key.pem', 'ascii'),
-  cert: fs.readFileSync('cert.pem', 'ascii')
+  key: fs.readFileSync(`${__dirname}/key.pem`, 'ascii'),
+  cert: fs.readFileSync(`${__dirname}/cert.pem`, 'ascii')
 };
 
 // Generate the server key pair.
+httpsServerDebug('generating keypair');
 const { publicKey, privateKey } = kem.keypair();
 const publicKeyId = computeKeyId(publicKey);
 
@@ -71,7 +72,10 @@ server.listen(8124, () => {
   });
   conn.on('error', err => console.error(err));
 
-  const req = https.request('https://localhost:8124/foo', { socket: conn });
+  const req = https.request('https://localhost:8124/foo', {
+    socket: conn,
+    rejectUnauthorized: false
+  });
   req.on('error', (err) => console.error(err));
 
   req.on('socket', (socket) => {
