@@ -47,7 +47,8 @@ const httpsServer = https.createServer(httpsOptions, (req, res) => {
     pqc: {
       publicKeyId: publicKeyId.toString('hex'),
       publicKeySignature: publicKeySignature.toString('hex')
-    }
+    },
+    tcp: req.socket.ssl._parentWrap.stream.nextLayer
   }));
 });
 

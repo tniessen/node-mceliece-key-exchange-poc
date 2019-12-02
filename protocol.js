@@ -77,6 +77,10 @@ class PQCBase extends Duplex {
     });
   }
 
+  get nextLayer() {
+    return this[kNextLayer];
+  }
+
   writeMessage(tag, msg) {
     let buf;
     if (msg) {
