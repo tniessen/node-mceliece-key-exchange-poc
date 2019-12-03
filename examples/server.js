@@ -5,14 +5,14 @@ const fs = require('fs');
 const https = require('https');
 const pug = require('pug');
 
-const pqc = require('../../pqc-over-tcp');
-const { kem, computeKeyId } = require('../../protocol');
+const pqc = require('../pqc-over-tcp');
+const { kem, computeKeyId } = require('../protocol');
 
 const httpsServerDebug = require('debug')('https:server');
 
 const httpsOptions = {
-  key: fs.readFileSync(`${__dirname}/../key.pem`, 'ascii'),
-  cert: fs.readFileSync(`${__dirname}/../cert.pem`, 'ascii')
+  key: fs.readFileSync(`${__dirname}/key.pem`, 'ascii'),
+  cert: fs.readFileSync(`${__dirname}/cert.pem`, 'ascii')
 };
 
 // Generate the server key pair.
@@ -36,19 +36,21 @@ const httpsServer = https.createServer(httpsOptions, (req, res) => {
     reqLines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`);
   }
 
+  const http = { reqLines };
+  const tls = { cert };
+  const hasPQC = !!req.socket.ssl._parentWrap.stream;
+  const pqc = hasPQC ? {
+    publicKeyId: publicKeyId.toString('hex'),
+    publicKeySignature: publicKeySignature.toString('hex')
+  } : undefined;
+  const tcp = hasPQC ? req.socket.ssl._parentWrap.stream.nextLayer : req.socket;
+
   res.setHeader('Content-Type', 'text/html');
   res.end(render({
-    http: {
-      reqLines
-    },
-    tls: {
-      cert
-    },
-    pqc: {
-      publicKeyId: publicKeyId.toString('hex'),
-      publicKeySignature: publicKeySignature.toString('hex')
-    },
-    tcp: req.socket.ssl._parentWrap.stream.nextLayer
+    http,
+    tls,
+    pqc,
+    tcp
   }));
 });
 
@@ -76,5 +78,10 @@ const server = pqc.createServer({
 // Wait for the server to be bound to a port.
 server.listen(8124, () => {
   const addr = server.address();
+  httpsServerDebug(`listening on ${addr.address}:${addr.port}`);
+});
+
+httpsServer.listen(443, () => {
+  const addr = httpsServer.address();
   httpsServerDebug(`listening on ${addr.address}:${addr.port}`);
 });

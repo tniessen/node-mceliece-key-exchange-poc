@@ -35,12 +35,13 @@ html
       p.lead Fingerprint (SHA-256):
       p.hexval= tls.cert.fingerprint256
       hr
-      h2 PQC layer
-      p.lead Public key id:
-      p.hexval= pqc.publicKeyId
-      p.lead Public key signature:
-      p.hexval= pqc.publicKeySignature
-      hr
+      if pqc
+        h2 PQC layer
+        p.lead Public key id:
+        p.hexval= pqc.publicKeyId
+        p.lead Public key signature:
+        p.hexval= pqc.publicKeySignature
+        hr
       h2 TCP layer
       p.lead Client address:
       p.hexval= tcp.remoteAddress
